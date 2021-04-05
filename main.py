@@ -7,6 +7,7 @@ import random
 
 import pandas as pd
 import numpy as np
+import scipy
 
 from sklearn.model_selection import train_test_split
 
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     with open(r"config.json") as f:
         args = json.load(f)
 
-    wandb.init(project= "NewsClassification", entity='lexitech', config=args)
+    wandb.init(project= "NewsClassification", entity='faruman', config=args)
     args = wandb.config
     wandb.log({'finished': False})
 
@@ -62,27 +63,27 @@ if __name__ == "__main__":
 
     ## do the data loading
     ### check for already preprocessed files
-    train_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_train_{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
-    val_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_val_{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+    train_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_train_{}-{}-{}-{}-{}-{}".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
+    val_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_val_{}-{}-{}-{}-{}-{}".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
     if args["test_data_file"]:
-        test_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_test_{}-{}-{}-{}-{}_{}.pkl".format(args["test_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+        test_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_test_{}-{}-{}-{}-{}-{}".format(args["test_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
     else:
-        test_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_test_{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+        test_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_test_{}-{}-{}-{}-{}-{}".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
     ### check for already tokenized files
     if "ngram" in tokenizer_model.keys():
-        train_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_train_{}-{}-{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
-        val_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_val_{}-{}-{}-{}-{}-{}_{}-{}.pkl".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+        train_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_train_{}-{}-{}-{}-{}-{}-{}-{}".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
+        val_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_val_{}-{}-{}-{}-{}-{}-{}_{}".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
         if args["test_data_file"]:
-            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}-{}_{}.pkl".format(args["test_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}-{}-{}".format(args["test_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
         else:
-            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}-{}-{}".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
     else:
-        train_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_train_{}-{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
-        val_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_val_{}-{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+        train_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_train_{}-{}-{}-{}-{}-{}-{}".format(args["train_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
+        val_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_val_{}-{}-{}-{}-{}-{}-{}".format(args["train_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
         if args["test_data_file"]:
-            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}_{}.pkl".format(args["test_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}-{}".format(args["test_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
         else:
-            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}_{}.pkl".format(args["train_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]))
+            test_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_test_{}-{}-{}-{}-{}-{}-{}".format(args["train_data_file"], tokenizer_model["tokenizer"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
 
     # TODO: Implement Whoosh Index for file storage store metadata with idx
     # TODO: Implement paraallel processing with pandarallel or dask
@@ -91,14 +92,20 @@ if __name__ == "__main__":
     run_preprocessing = False
     run_tokenization = False
 
-    if os.path.exists(train_tok_path) and os.path.exists(val_tok_path) and os.path.exists(test_tok_path):
-        df_train = pd.read_pickle(train_tok_path)
-        df_val = pd.read_pickle(val_tok_path)
-        df_test = pd.read_pickle(test_tok_path)
-    elif os.path.exists(train_pre_path) and os.path.exists(val_pre_path) and os.path.exists(test_pre_path):
-        df_train = pd.read_pickle(train_pre_path)
-        df_val = pd.read_pickle(val_pre_path)
-        df_test = pd.read_pickle(test_pre_path)
+    if os.path.exists(train_tok_path.format("data") + ".npy") and os.path.exists(train_tok_path.format("target") + ".npy") and os.path.exists(val_tok_path.format("data") + ".npy") and os.path.exists(val_tok_path.format("target") + ".npy") and os.path.exists(test_tok_path.format("data") + ".npy") and os.path.exists(test_tok_path.format("target") + ".npy"):
+        train_data = np.load(train_tok_path.format("data") + ".npy", allow_pickle=True)
+        val_data = np.load(val_tok_path.format("data") + ".npy", allow_pickle=True)
+        test_data = np.load(test_tok_path.format("data") + ".npy", allow_pickle=True)
+        train_target = np.load(train_tok_path.format("target") + ".npy", allow_pickle=True)
+        val_target = np.load(val_tok_path.format("target") + ".npy", allow_pickle=True)
+        test_target = np.load(test_tok_path.format("target") + ".npy", allow_pickle=True)
+    elif os.path.exists(train_pre_path.format("data") + ".npy") and os.path.exists(train_pre_path.format("target") + ".npy") and os.path.exists(val_pre_path.format("data") + ".npy") and os.path.exists(val_pre_path.format("target") + ".npy") and os.path.exists(test_pre_path.format("data") + ".npy") and os.path.exists(test_pre_path.format("target") + ".npy"):
+        train_data = np.load(train_pre_path.format("data") + ".npy", allow_pickle=True)
+        val_data = np.load(val_pre_path.format("data") + ".npy", allow_pickle=True)
+        test_data = np.load(test_pre_path.format("data") + ".npy", allow_pickle=True)
+        train_target = np.load(train_pre_path.format("target") + ".npy", allow_pickle=True)
+        val_target = np.load(val_pre_path.format("target") + ".npy", allow_pickle=True)
+        test_target = np.load(test_pre_path.format("target") + ".npy", allow_pickle=True)
         run_tokenization = True
     else:
         run_preprocessing = True
@@ -142,51 +149,51 @@ if __name__ == "__main__":
 
         ## get data and train columns
         data_column = list(set(train_df.columns) - set(args["targets"]))[0]
+        train_target = train_df[args["targets"]].values
+        val_target = val_df[args["targets"]].values
+        test_target = test_df[args["targets"]].values
 
         ## do the preprocessing
         print("Preprocess")
         preprocessor = Preprocessor(doLower= args["doLower"], doLemmatization= args["doLemmatization"], removeStopWords= args["removeStopWords"], doSpellingCorrection= False, removeNewLine= args["removeNewLine"], removePunctuation=args["removePunctuation"], removeHtmlTags= False, minTextLength = args["minTextLength"])
-        train_df[data_column] = preprocessor.fit_transform(train_df[data_column])
-        train_df = train_df.dropna()
-        val_df[data_column] = preprocessor.transform(val_df[data_column])
-        val_df = val_df.dropna()
-        test_df[data_column] = preprocessor.transform(test_df[data_column])
-        test_df = test_df.dropna()
+        train_data = preprocessor.fit_transform(train_df[data_column])
+        train_target = train_target[~pd.isnull(train_data)]
+        train_data = train_data[~pd.isnull(train_data)]
+        val_data = preprocessor.transform(val_df[data_column])
+        val_target = val_target[~pd.isnull(val_data)]
+        val_data = val_data[~pd.isnull(val_data)]
+        test_data = preprocessor.transform(test_df[data_column])
+        test_target = test_target[~pd.isnull(test_data)]
+        test_data = test_data[~pd.isnull(test_data)]
 
         ## save the preprocessed data
         if not os.path.exists(os.path.join(args["data_path"], "temp")):
             os.makedirs(os.path.join(args["data_path"], "temp"))
-        train_df.to_pickle(train_pre_path)
-        val_df.to_pickle(val_pre_path)
-        test_df.to_pickle(test_pre_path)
-    else:
-        train_df = pd.read_pickle(train_pre_path)
-        val_df = pd.read_pickle(val_pre_path)
-        test_df = pd.read_pickle(test_pre_path)
-        ## get data and train columns
-        data_column = list(set(train_df.columns) - set(args["targets"]))[0]
+        np.save(train_pre_path.format("data"), train_data, allow_pickle=True)
+        np.save(val_pre_path.format("data"), val_data, allow_pickle=True)
+        np.save(test_pre_path.format("data"), test_data, allow_pickle=True)
+        np.save(train_pre_path.format("target"), train_target, allow_pickle=True)
+        np.save(val_pre_path.format("target"), val_target, allow_pickle=True)
+        np.save(test_pre_path.format("target"), test_target, allow_pickle=True)
 
 
     if run_tokenization:
         ## do tokenization
         print("Tokenize")
         tokenizer = Tokenizer(args= tokenizer_model, fasttextFile= args["fasttext_file"], doLower= args["doLower"])
-        train_df[data_column] = tokenizer.fit_transform(train_df[data_column])
-        val_df[data_column] = tokenizer.transform(val_df[data_column])
-        test_df[data_column] = tokenizer.transform(test_df[data_column])
+        train_data = tokenizer.fit_transform(train_data)
+        val_data = tokenizer.transform(val_data)
+        test_data = tokenizer.transform(test_data)
 
         ## save the preprocessed data
         if not os.path.exists(os.path.join(args["data_path"], "temp")):
             os.makedirs(os.path.join(args["data_path"], "temp"))
-        train_df.to_pickle(train_tok_path)
-        val_df.to_pickle(val_tok_path)
-        test_df.to_pickle(test_tok_path)
-
-    else:
-        train_df = pd.read_pickle(train_tok_path)
-        val_df = pd.read_pickle(val_tok_path)
-        test_df = pd.read_pickle(test_tok_path)
-
+        np.save(train_tok_path.format("data"), train_data)
+        np.save(val_tok_path.format("data"), val_data)
+        np.save(test_tok_path.format("data"), test_data)
+        np.save(train_tok_path.format("target"), train_target)
+        np.save(val_tok_path.format("target"), val_target)
+        np.save(test_tok_path.format("target"), test_target)
 
     ## for testing purposes
     #train_df = train_df.sample(100)
@@ -200,9 +207,9 @@ if __name__ == "__main__":
     max_label_len = max([len(word_tokenize(x)) for x in labelSentencesDict.values()])
 
     print("Train Model")
-    model = Model(args= tokenizer_model, doLower= args["doLower"], train_batchSize= args["train_batchSize"], testval_batchSize= args["testval_batchSize"], learningRate= args["learningRate"], doLearningRateScheduler= args["doLearningRateScheduler"], labelSentences= labelSentencesDict, smartBatching=args["smartBatching"], max_label_len= max_label_len, device= device)
+    model = Model(args= tokenizer_model, doLower= args["doLower"], train_batchSize= args["train_batchSize"], testval_batchSize= args["testval_batchSize"], learningRate= args["learningRate"], doLearningRateScheduler= args["doLearningRateScheduler"], labelSentences= labelSentencesDict, smartBatching=args["smartBatching"], max_label_len= max_label_len, device= device, target_columns= args["targets"])
 
-    model.run(train_data= train_df[data_column], train_target= train_df[args["targets"]], val_data= val_df[data_column], val_target= val_df[args["targets"]], test_data= test_df[data_column], test_target= test_df[args["targets"]], epochs= args["numEpochs"])
+    model.run(train_data= train_data, train_target= train_target, val_data= val_data, val_target= val_target, test_data= test_data, test_target= test_target, epochs= args["numEpochs"])
 
     wandb.log({'finished': True})
 

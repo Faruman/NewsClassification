@@ -67,7 +67,7 @@ class Preprocessor():
     def transform(self, series: pd.Series):
         temp = series.progress_apply(self.processor)
         temp[temp.apply(len) < self.minTextLength] = np.nan
-        return temp
+        return temp.values
 
     def fit_transform(self, series: pd.Series):
         self.fit(series)

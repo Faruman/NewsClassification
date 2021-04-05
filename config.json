@@ -1,7 +1,6 @@
 {
   "data_path" : "./data",
   "model_path" : "./model",
-  "excel_path" : "./excel",
   "train_data_file" : "agnews_train.csv",
   "train_data_drop": ["label", "label_int"],
   "train_target_file" : "",
@@ -27,13 +26,12 @@
   "removeHtmlTags": true,
   "minTextLength": 15,
 
-  "tokenizer_model": "{'tokenizer': 'bert', 'model': 'bert', 'binaryClassification': 'True'}",
+  "tokenizer_model": "{'tokenizer': 'fasttext_max', 'model': 'gradientboost', 'n_estimators': 25, 'max_depth': 5}",
   "fasttext_file": "./support/cc.en.300.bin",
   "train_batchSize": 12,
   "testval_batchSize": 24,
   "smartBatching": false,
 
-  "optimizer": "adam",
   "learningRate": 0.00000965,
   "doLearningRateScheduler": false,
 

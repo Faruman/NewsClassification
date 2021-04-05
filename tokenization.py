@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+
 from transformers import DistilBertTokenizer, BertTokenizer, XLMTokenizer, RobertaTokenizer
 from nltk import word_tokenize
 import fasttext
@@ -23,7 +25,9 @@ class Tokenizer():
             def generate_BERT_vectors(s):
                 toks = tokenizer(s,  return_attention_mask= True, padding="max_length", truncation= True)
                 return (toks["input_ids"], toks["attention_mask"])
-            self.tokenizer = generate_BERT_vectors
+            def tokenizer_fun(series):
+                return series.progress_apply(generate_BERT_vectors)
+            self.tokenizer = tokenizer_fun
 
         elif self.args["tokenizer"] == "distilbert":
             if self.doLower:
@@ -34,7 +38,9 @@ class Tokenizer():
             def generate_DistilBERT_vectors(s):
                 toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation= True)
                 return (toks["input_ids"], toks["attention_mask"])
-            self.tokenizer = generate_DistilBERT_vectors
+            def tokenizer_fun(series):
+                return series.progress_apply(generate_DistilBERT_vectors)
+            self.tokenizer = tokenizer_fun
 
         elif self.args["tokenizer"] == "xlnet":
             if self.doLower:
@@ -47,6 +53,9 @@ class Tokenizer():
                 toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation=True)
                 return (toks["input_ids"], toks["attention_mask"])
             self.tokenizer = generate_XLM_vectors
+            def tokenizer_fun(series):
+                return series.progress_apply(generate_XLM_vectors)
+            self.tokenizer = tokenizer_fun
 
         elif self.args["tokenizer"] == "roberta":
             if self.doLower:
@@ -58,7 +67,9 @@ class Tokenizer():
             def generate_Roberta_vectors(s):
                 toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation=True)
                 return (toks["input_ids"], toks["attention_mask"])
-            self.tokenizer = generate_Roberta_vectors
+            def tokenizer_fun(series):
+                return series.progress_apply(generate_Roberta_vectors)
+            self.tokenizer = tokenizer_fun
 
         elif self.args["tokenizer"] == "distilroberta":
             if self.doLower:
@@ -70,34 +81,45 @@ class Tokenizer():
             def generate_DistilRoberta_vectors(s):
                 toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation=True)
                 return (toks["input_ids"], toks["attention_mask"])
-            self.tokenizer = generate_DistilRoberta_vectors
+            def tokenizer_fun(series):
+                return series.progress_apply(generate_DistilRoberta_vectors)
+            self.tokenizer = tokenizer_fun
 
         elif "fasttext" in self.args["tokenizer"]:
             embeddingModel = fasttext.load_model(self.fasttextFile)
             def generate_fasttext_vectors(s):
                 words = word_tokenize(s)
                 words_embed = [embeddingModel.get_word_vector(w) for w in words if w.isalpha()]
-                if "average" in self.args["tokenizer"]:
-                    words_embed
+                if "mean" in self.args["tokenizer"]:
+                    words_embed = np.column_stack(words_embed).mean(axis=1)
                 elif "max" in self.args["tokenizer"]:
-                    words_embed
+                    words_embed = np.column_stack(words_embed).max(axis=1)
                 else:
                     pass
                 return words_embed
-            self.tokenizer = generate_fasttext_vectors
+            def tokenizer_fun(series):
+                if "mean" in self.args["tokenizer"] or "max" in self.args["tokenizer"]:
+                    return np.row_stack(pd.Series(series).progress_apply(generate_fasttext_vectors).values)
+                else:
+                    return pd.Series(series).progress_apply(generate_fasttext_vectors).values
+            self.tokenizer = tokenizer_fun
 
         elif self.args["tokenizer"] == "bow":
             vectorizer = CountVectorizer(ngram_range= (1, self.args["ngram"]))
-            vectorizer.fit(series)
-            self.tokenizer = vectorizer.transform
+            vectorizer.fit(series.values)
+            def tokenizer_fun(series):
+                return vectorizer.transform(series.values)
+            self.tokenizer = tokenizer_fun
 
         elif self.args["tokenizer"] == "tfidf":
             vectorizer = TfidfVectorizer(ngram_range= (1, self.args["ngram"]))
-            vectorizer.fit(series)
-            self.tokenizer = vectorizer.transform
+            vectorizer.fit(series.values)
+            def tokenizer_fun(series):
+                return vectorizer.transform(series.values)
+            self.tokenizer = tokenizer_fun
 
     def transform(self, series: pd.Series):
-        return series.progress_apply(self.tokenizer)
+        return self.tokenizer(series)
 
     def fit_transform(self, series: pd.Series):
         self.fit(series)

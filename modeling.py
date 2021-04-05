@@ -23,8 +23,13 @@ from transformers import DistilBertForSequenceClassification, BertForSequenceCla
 from transformers import DistilBertTokenizer, BertTokenizer, XLNetTokenizer, RobertaTokenizer
 from transformers import get_cosine_schedule_with_warmup
 
-from sklearn.ensemble import GradientBoostingClassifier
+from xgboost import XGBClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import SGDClassifier
 
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 
@@ -51,7 +56,7 @@ def plot_auc(label, score, title):
 #TODO: implement new step variabels
 
 class Model():
-    def __init__(self, args: dict, doLower: bool, train_batchSize: int, testval_batchSize:int, learningRate: float, doLearningRateScheduler: bool, smartBatching: bool = True, mixedPrecision: bool = True, labelSentences: dict = None, max_label_len= None, model= None, optimizer= None, loss_fct= None, target_columns= None, device= "cpu"):
+    def __init__(self, args: dict, doLower: bool, train_batchSize: int, testval_batchSize:int, learningRate: float, doLearningRateScheduler: bool, target_columns: list, smartBatching: bool = True, mixedPrecision: bool = True, labelSentences: dict = None, max_label_len= None, model= None, optimizer= None, loss_fct= None, device= "cpu"):
         self.args = args
         self.labelSentences = labelSentences
         self.tokenizer = None
@@ -66,16 +71,18 @@ class Model():
         self.mixedPrecision = mixedPrecision
         self.max_label_len = max_label_len
         self.target_columns = target_columns
+        self.input_multiclass_as_one = False
 
-        if loss_fct:
-            self.loss_fct = loss_fct
-        else:
-            self.loss_fct = BCEWithLogitsLoss()
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
+            if loss_fct:
+                self.loss_fct = loss_fct
+            else:
+                self.loss_fct = BCEWithLogitsLoss()
 
-        if self.args["binaryClassification"]:
-            self.num_labels = 1
-        else:
-            self.num_labels = len(self.labelSentences.keys())
+            if self.args["binaryClassification"]:
+                self.num_labels = 1
+            else:
+                self.num_labels = len(self.labelSentences.keys())
 
         if self.args["model"] == "distilbert":
             if doLower:
@@ -121,22 +128,34 @@ class Model():
         #elif self.args["model"] == "CNN":
         #    self.model = MyLSTM(num_labels=self.num_labels)
 
-        elif self.args["model"] == "GradBoost":
+        elif self.args["model"] == "gradientboost":
             self.model = GradientBoostingClassifier(learning_rate= self.learningRate, n_estimators= self.args["n_estimators"], max_depth= self.args["max_depth"], verbose=1)
+            self.input_multiclass_as_one = True
 
-        elif self.args["model"] == "NaiveBayes":
-            self.model = MultinomialNB(alpha= self.learningRate)
+        elif self.args["model"] == "randomforest":
+            self.model = RandomForestClassifier(learning_rate= self.learningRate, n_estimators= self.args["n_estimators"], max_depth= self.args["max_depth"], verbose=1, n_jobs= -1)
+            self.input_multiclass_as_one = True
+
+        elif self.args["model"] == "naivebayes":
+            self.model = OneVsRestClassifier(MultinomialNB(alpha= self.learningRate))
+
+        elif self.args["model"] == "naivebayes_norm":
+            self.model = Pipeline([
+                ("nb_norm", MinMaxScaler()),
+                ("nb_clf", OneVsRestClassifier(MultinomialNB(alpha= self.learningRate)))
+                ])
+
+        elif self.args["model"] == "sgd":
+            self.model = OneVsRestClassifier(SGDClassifier(alpha= self.learningRate, loss='hinge', penalty='l2'))
 
         else:
             logging.error("Define a model in the args dict.")
             sys.exit("Define a model in the args dict.")
 
-    def preprocess(self, data: pd.Series, target, max_label_len):
-        target = target.reset_index(drop=True)
-        data = data.reset_index(drop=True)
-        if self.args["model"] in ["distilbert", "bert", "xlnet"]:
-            df = pd.DataFrame([[a, b] for a, b in data.values], columns=["data", "mask"])
-            df = pd.concat([df, target], axis=1)
+    def preprocess(self, data, target, max_label_len, target_columns):
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
+            df = pd.DataFrame([[a, b] for a, b in data], columns=["data", "mask"])
+            df = pd.concat([df, pd.DataFrame(target, columns=target_columns)], axis=1)
             if self.args["binaryClassification"]:
                 max_label_len += 2
                 if type(self.labelSentences[list(self.labelSentences.keys())[0]]) == str:
@@ -147,7 +166,7 @@ class Model():
                         mask = temp["attention_mask"][1:]
                         self.labelSentences[key] = (encoded_text, mask)
                 max_label_len -= 1
-                if set(target.columns).issubset(set(self.labelSentences.keys())):
+                if set(target_columns).issubset(set(self.labelSentences.keys())):
                     def create_samples(df_row, target_columns):
                         output_base = list()
                         output_mask = list()
@@ -169,24 +188,24 @@ class Model():
                         df_row["data"] = np.array(output_base)
                         df_row["mask"] = np.array(output_mask)
                         return df_row
-                    df = df.apply(create_samples, args= (target.columns,), axis=1)
+                    df = df.apply(create_samples, args= (target_columns,), axis=1)
                 else:
                     logging.error("Target columns need to be subset of labelSentences.keys.")
                     sys.exit("Target columns need to be subset of labelSentences.keys.")
-                return df["data"], df["mask"], target
+                return df["data"].values, df["mask"].values, target
             else:
-                return df["data"], df["mask"], target
+                return df["data"].values, df["mask"].values, target
         else:
             mask = np.full(data.shape, 1)
             return data, mask, target
 
     def applySmartBatching(self, data, mask, target= None, index= None, text= "Iteration:"):
-        data = np.stack(data.values)
-        mask = np.stack(mask.values)
+        data = np.stack(data)
+        mask = np.stack(mask)
         if target is not None and index is None:
-            target = target.values
+            target = target
         elif index is not None and target is None:
-            index = index.values
+            index = index
         else:
             logging.warning("Provide exactly one of target or index.")
 
@@ -248,10 +267,10 @@ class Model():
             return tzip(data_batch, mask_batch, desc=text)
 
     def applyNormalBatching(self, data, mask, target = None, text= "Iteration:"):
-        data = torch.tensor(np.stack(data.values), dtype=torch.long)
-        mask = torch.tensor(np.stack(mask.values), dtype=torch.long)
+        data = torch.tensor(np.stack(data), dtype=torch.long)
+        mask = torch.tensor(np.stack(mask), dtype=torch.long)
         if target is not None:
-            target = torch.tensor(target.values, dtype=torch.int32)
+            target = torch.tensor(target, dtype=torch.int32)
             data = TensorDataset(data, mask, target)
         else:
             data = TensorDataset(data, mask)
@@ -262,7 +281,7 @@ class Model():
         # TODO: Create own training routine for simple models
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             if self.smartBatching:
-                dataloader = self.applySmartBatching(data, mask, target, text= "Do Training:")
+                dataloader = self.applySmartBatching(data, mask, target, text= "Do training:")
             else:
                 dataloader = self.applyNormalBatching(data, mask, target, text= "Do Training:")
 
@@ -280,7 +299,7 @@ class Model():
                     mask = mask.reshape(mask.shape[0]*mask.shape[1], mask.shape[2])
                     target = target.reshape(target.shape[0]*target.shape[1])
 
-                    if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+                    if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                         data = torch.split(data, int(data.shape[0] / len(self.labelSentences.keys())))
                         mask = torch.split(mask, int(mask.shape[0] / len(self.labelSentences.keys())))
                         target = torch.split(target, int(target.shape[0] / len(self.labelSentences.keys())))
@@ -306,7 +325,7 @@ class Model():
                         wandb.log({'train_batch_loss': sum_loss})
 
                 else:
-                    if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+                    if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                         logits = self.model(input_ids= data, attention_mask= mask)[0]
 
                         loss = self.loss_fct(logits, target.type_as(logits))
@@ -326,11 +345,13 @@ class Model():
                 if self.learningRateScheduler:
                     self.learningRateScheduler.step()
         else:
-            self.model.fit(data, target)
+            if self.input_multiclass_as_one:
+                self.model.fit(data, np.argmax(target, axis=1))
+            else:
+                self.model.fit(data, target)
 
 
-    def test_validate(self, data, mask, target, type: str, device= "cpu", excel_path= None, excel_name= "test", use_wandb= True, decision_dict= None):
-        # TODO: Create own training routine for simple models
+    def test_validate(self, data, mask, target, type: str, device= "cpu", use_wandb= True, decision_dict= None):
         if not decision_dict:
             decision_dict = dict(zip(self.target_columns, [0.5]*len(self.target_columns)))
 
@@ -340,7 +361,7 @@ class Model():
             else:
                 dataloader = self.applyNormalBatching(data, mask, target, text= "Do {}:".format(type))
 
-            if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+            if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                 self.model.eval()
             else:
                 if self.args["binaryClassification"]:
@@ -359,7 +380,7 @@ class Model():
                     mask = mask.to(device)
 
                     if self.args["binaryClassification"]:
-                        if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+                        if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                             model_output = []
                             for i, label in enumerate(self.target_columns):
                                 ind_model_output = self.model(data[:, i, :], mask[:, i, :])[0]
@@ -373,7 +394,7 @@ class Model():
                                 model_output.append(ind_model_output)
                             model_output = torch.sigmoid(torch.cat(model_output, 0))
                     else:
-                        if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+                        if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                             model_output = self.model(data, mask)[0]
                             model_output = torch.sigmoid(model_output)
 
@@ -386,67 +407,36 @@ class Model():
 
             all_targets = np.concatenate(all_targets)
             all_model_outputs = np.concatenate(all_model_outputs)
+            all_model_outputs.transpose()
         else:
             all_targets = target
-            all_model_outputs = self.model.predict(data)
+            all_model_outputs = self.model.predict_proba(data)
 
-        macroF1 = []
-        macroPrec = []
-        macroRec = []
-        macroAuc = []
-        for i, (ind_target, ind_model_logits, label) in enumerate(zip(all_targets.transpose(), all_model_outputs.transpose(), self.target_columns)):
-            macroF1.append(f1_score(ind_target, (ind_model_logits > decision_dict[label]).astype(int)))
-            macroPrec.append(precision_score(ind_target, (ind_model_logits > decision_dict[label]).astype(int)))
-            macroRec.append(recall_score(ind_target, (ind_model_logits > decision_dict[label]).astype(int)))
-            try:
-                macroAuc.append(roc_auc_score(ind_target, ind_model_logits))
-            except:
-                macroAuc.append(0)
-            #myplot = plot_auc(ind_target, ind_model_logits, self.target_columns[i])
-            #myplot.savefig("./plots/Prec_Rec_Plot_{}.png".format(self.target_columns[i]))
-            #myplot.show()
+        all_model_outputs = np.argmax(all_model_outputs, axis=1)
+        all_targets = np.argmax(all_targets, axis=1)
 
-        # individual accuracy just implemented for comparability to https://www.aclweb.org/anthology/N19-1035/
-        for i in range(all_model_outputs.shape[1]):
-            all_model_outputs[:, i] = (all_model_outputs[:, i] > decision_dict[self.target_columns[i]]).astype(int)
-
-        indivAcc = accuracy_score(all_targets.flatten(), all_model_outputs.flatten())
-        subsetAcc = accuracy_score(all_targets, all_model_outputs)
-
-        # create excel files for metrix by cathegory (only for test runs)
-        if excel_path:
-            # Creating Excel Writer Object from Pandas
-            if use_wandb:
-                name = wandb.run.name
-            else:
-                name = excel_name
-            with pd.ExcelWriter(excel_path + '/{}.xlsx'.format(name)) as writer:
-                pd.DataFrame([macroAuc], columns= self.target_columns, index= [0]).to_excel(writer, 'macroAuc', index=False)
-                pd.DataFrame([macroF1], columns=self.target_columns, index=[0]).to_excel(writer, 'macroF1', index=False)
-                pd.DataFrame([macroPrec], columns=self.target_columns, index=[0]).to_excel(writer, 'macroPrec', index=False)
-                pd.DataFrame([macroRec], columns=self.target_columns, index=[0]).to_excel(writer, 'macroRec', index=False)
-                writer.save()
-
-        macroF1 = statistics.mean(macroF1)
-        macroPrec = statistics.mean(macroPrec)
-        macroRec = statistics.mean(macroRec)
-        macroAuc = statistics.mean(macroAuc)
+        macroF1 = f1_score(all_targets, all_model_outputs, average= "macro")
+        macroPrec = precision_score(all_targets, all_model_outputs, average= "macro")
+        macroRec = recall_score(all_targets, all_model_outputs, average= "macro")
+        Acc = accuracy_score(all_targets, all_model_outputs)
 
         if use_wandb:
-            wandb.log({'{}_macroF1'.format(type): macroF1, '{}_macroPrec'.format(type): macroPrec, '{}_macroRec'.format(type): macroRec, '{}_subsetAcc'.format(type): subsetAcc, '{}_indivAcc'.format(type): indivAcc, '{}_macroAuc'.format(type): macroAuc})
+            wandb.log({'{}_macroF1'.format(type): macroF1, '{}_macroPrec'.format(type): macroPrec, '{}_macroRec'.format(type): macroRec, '{}_Acc'.format(type): Acc})
         else:
-            return {'{}_macroF1'.format(type): macroF1, '{}_macroPrec'.format(type): macroPrec, '{}_macroRec'.format(type): macroRec, '{}_subsetAcc'.format(type): subsetAcc, '{}_indivAcc'.format(type): indivAcc, '{}_macroAuc'.format(type): macroAuc}
+            return {'{}_macroF1'.format(type): macroF1, '{}_macroPrec'.format(type): macroPrec, '{}_macroRec'.format(type): macroRec, '{}_Acc'.format(type): Acc}
 
-    def run(self, train_data, train_target, val_data, val_target, test_data, test_target, epochs: int, optimizer= None, excel_path= None):
-        if optimizer:
-            self.optimizer = optimizer
-        train_data, train_mask, train_target = self.preprocess(train_data, train_target, self.max_label_len)
-        val_data, val_mask, val_target = self.preprocess(val_data, val_target, self.max_label_len)
-        test_data, test_mask, test_target = self.preprocess(test_data, test_target, self.max_label_len)
-        self.target_columns = list(train_target.columns)
+    def run(self, train_data, train_target, val_data, val_target, test_data, test_target, epochs: int):
+        train_data, train_mask, train_target = self.preprocess(train_data, train_target, self.max_label_len, self.target_columns)
+        val_data, val_mask, val_target = self.preprocess(val_data, val_target, self.max_label_len, self.target_columns)
+        test_data, test_mask, test_target = self.preprocess(test_data, test_target, self.max_label_len, self.target_columns)
 
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
-            self.model.to(self.device)
+            if self.args["optimizer"] == "adam":
+                self.optimizer = optim.Adam(self.model.parameters(), self.learningRate)
+            elif self.args["optimizer"] == "sgd":
+                self.optimizer = torch.optim.SGD(self.model.parameters(), self.learningRate)
+            else:
+                self.optimizer = None
 
             if not self.optimizer:
                 self.optimizer = optim.Adam(self.model.parameters(), self.learningRate)
@@ -454,15 +444,18 @@ class Model():
                 num_train_steps = epochs * math.ceil(train_data.shape[0] / self.train_batchSize)
                 self.learningRateScheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps=int(0.1*num_train_steps), num_training_steps=num_train_steps)
 
+            self.model.to(self.device)
+
             for i in range(epochs):
                 print("epoch {}".format(i))
                 self.train(train_data, train_mask, train_target, device= self.device)
                 self.test_validate(val_data, val_mask, val_target, type= "validate", device= self.device)
-            self.test_validate(test_data, test_mask, test_target, type= "test", device= self.device, excel_path= excel_path)
+            self.test_validate(test_data, test_mask, test_target, type= "test", device= self.device)
 
         else:
             self.train(train_data, train_mask, train_target, device=self.device)
-            self.test_validate(test_data, test_mask, test_target, type="test", device=self.device, excel_path=excel_path)
+            self.test_validate(val_data, val_mask, val_target, type="validate", device=self.device)
+            self.test_validate(test_data, test_mask, test_target, type="test", device=self.device)
 
     def save(self, file_path: str):
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
@@ -472,9 +465,9 @@ class Model():
             tokens = torch.tensor([tokens["input_ids"]]).to("cuda")
             self.model.eval()
             traced_model = torch.jit.trace(self.model, (tokens, mask))
-            traced_model.save(file_path)
+            traced_model.save(file_path + ".pt")
         else:
-            with open(file_path, 'wb') as file:
+            with open(file_path + ".pkl", 'wb') as file:
                 pickle.dump(self.model, file)
 
         pd.DataFrame(data=self.target_columns, columns=["target"]).to_csv(file_path[:-3] + "_targetConfig.csv")
@@ -502,7 +495,7 @@ class Model():
             else:
                 dataloader = self.applyNormalBatching(data, mask, text="Do Inference")
 
-            if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+            if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                 self.model.eval()
             else:
                 if self.args["binaryClassification"]:
@@ -521,7 +514,7 @@ class Model():
                     mask = mask.to(device)
 
                     if self.args["binaryClassification"]:
-                        if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+                        if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                             model_output = []
                             for i, label in enumerate(self.target_columns):
                                 ind_model_output = self.model(data[:, i, :], mask[:, i, :])[0]
@@ -535,7 +528,7 @@ class Model():
                                 model_output.append(ind_model_output)
                             model_output = torch.sigmoid(torch.cat(model_output, 0))
                     else:
-                        if self.args["model"] in ["distilbert", "bert", "xlnet"]:
+                        if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
                             model_output = self.model(input_ids=data, attention_mask=mask)[0]
                             model_output = torch.sigmoid(model_output)
 
