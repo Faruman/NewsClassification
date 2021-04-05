@@ -1,3 +1,3 @@
-# Put the data in this folder
+# data folder
 
-The data can be downloaded from the following https://www.kaggle.com/amananandrai/ag-news-classification-dataset
+Download the data from this url: https://data.deepai.org/agnews.zip and put the unpacked data in this folder.
