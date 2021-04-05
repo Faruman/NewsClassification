@@ -1,0 +1,41 @@
+{
+  "data_path" : "./data",
+  "model_path" : "./model",
+  "excel_path" : "./excel",
+  "train_data_file" : "agnews_train.csv",
+  "train_data_drop": ["label", "label_int"],
+  "train_target_file" : "",
+  "train_merge_on": [],
+
+  "validation_split": 0.15,
+  "test_split": 0.15,
+  "data_used": 1,
+
+  "test_data_file": "agnews_test.csv",
+  "test_data_drop": ["label", "label_int"],
+  "test_target_file": "",
+  "test_merge_on": [],
+
+  "targets" : ["science_int", "sports_int", "world_int", "business_int"],
+
+  "preprocessing": true,
+  "doLower": true,
+  "doLemmatization": false,
+  "removeStopWords": false,
+  "removePunctuation": false,
+  "removeNewLine": false,
+  "removeHtmlTags": true,
+  "minTextLength": 15,
+
+  "tokenizer_model": "{'tokenizer': 'bert', 'model': 'bert', 'binaryClassification': 'True'}",
+  "fasttext_file": "./support/cc.en.300.bin",
+  "train_batchSize": 12,
+  "testval_batchSize": 24,
+  "smartBatching": false,
+
+  "optimizer": "adam",
+  "learningRate": 0.00000965,
+  "doLearningRateScheduler": false,
+
+  "numEpochs": 3
+}
