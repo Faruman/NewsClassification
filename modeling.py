@@ -19,8 +19,8 @@ from torch.nn import BCELoss, CrossEntropyLoss
 from torch.nn import BCEWithLogitsLoss
 from torch import optim
 
-from transformers import DistilBertForSequenceClassification, BertForSequenceClassification, XLNetForSequenceClassification
-from transformers import DistilBertTokenizer, BertTokenizer, XLNetTokenizer
+from transformers import DistilBertForSequenceClassification, BertForSequenceClassification, XLNetForSequenceClassification, RobertaForSequenceClassification
+from transformers import DistilBertTokenizer, BertTokenizer, XLNetTokenizer, RobertaTokenizer
 from transformers import get_cosine_schedule_with_warmup
 
 from sklearn.ensemble import GradientBoostingClassifier
@@ -101,6 +101,22 @@ class Model():
             else:
                 self.model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased', num_labels=self.num_labels, output_attentions=False, output_hidden_states=False, torchscript=True)
                 self.tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+
+        elif self.args["model"] == "roberta":
+            if doLower:
+                self.model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=self.num_labels, output_attentions=False, output_hidden_states=False, torchscript=True)
+                self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+            else:
+                self.model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=self.num_labels, output_attentions=False, output_hidden_states=False, torchscript=True)
+                self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+
+        elif self.args["model"] == "distilroberta":
+            if doLower:
+                self.model = RobertaForSequenceClassification.from_pretrained('distilroberta-base', num_labels=self.num_labels, output_attentions=False, output_hidden_states=False, torchscript=True)
+                self.tokenizer = RobertaTokenizer.from_pretrained('distilroberta-base')
+            else:
+                self.model = RobertaForSequenceClassification.from_pretrained('distilroberta-base', num_labels=self.num_labels, output_attentions=False, output_hidden_states=False, torchscript=True)
+                self.tokenizer = RobertaTokenizer.from_pretrained('distilroberta-base')
 
         #elif self.args["model"] == "CNN":
         #    self.model = MyLSTM(num_labels=self.num_labels)
@@ -234,7 +250,7 @@ class Model():
     def applyNormalBatching(self, data, mask, target = None, text= "Iteration:"):
         data = torch.tensor(np.stack(data.values), dtype=torch.long)
         mask = torch.tensor(np.stack(mask.values), dtype=torch.long)
-        if target:
+        if target is not None:
             target = torch.tensor(target.values, dtype=torch.int32)
             data = TensorDataset(data, mask, target)
         else:
@@ -244,7 +260,7 @@ class Model():
     def train(self, data, mask, target, device= "cpu"):
         # TODO: recreate batches each epoch? => no, create extra argument
         # TODO: Create own training routine for simple models
-        if self.args["model"] in ["distilbert", "bert", "xlnet", "LSTM"]:
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             if self.smartBatching:
                 dataloader = self.applySmartBatching(data, mask, target, text= "Do Training:")
             else:
@@ -318,7 +334,7 @@ class Model():
         if not decision_dict:
             decision_dict = dict(zip(self.target_columns, [0.5]*len(self.target_columns)))
 
-        if self.args["model"] in ["distilbert", "bert", "xlnet", "LSTM"]:
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             if self.smartBatching:
                 dataloader = self.applySmartBatching(data, mask, target, text= "Do {}:".format(type))
             else:
@@ -429,7 +445,7 @@ class Model():
         test_data, test_mask, test_target = self.preprocess(test_data, test_target, self.max_label_len)
         self.target_columns = list(train_target.columns)
 
-        if self.args["model"] in ["distilbert", "bert", "xlnet", "LSTM"]:
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             self.model.to(self.device)
 
             if not self.optimizer:
@@ -449,7 +465,7 @@ class Model():
             self.test_validate(test_data, test_mask, test_target, type="test", device=self.device, excel_path=excel_path)
 
     def save(self, file_path: str):
-        if self.args["model"] in ["distilbert", "bert", "xlnet", "LSTM"]:
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             # save as torchscript
             tokens = self.tokenizer("All the appetizers and salads were fabulous, the steak was mouth watering and the pasta was delicious!!! [SEP] Die Bewertung des Preises ist positiv.", padding="max_length", max_length=512)
             mask = torch.tensor([tokens["attention_mask"]]).to("cuda")
@@ -465,7 +481,7 @@ class Model():
 
 
     def load(self, file_path):
-        if self.args["model"] in ["distilbert", "bert", "xlnet", "LSTM"]:
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             self.model = torch.jit.load(file_path)
         else:
             with open(file_path, 'rb') as file:
@@ -479,7 +495,7 @@ class Model():
 
         data, mask, target = self.preprocess(data, target, self.max_label_len)
 
-        if self.args["model"] in ["distilbert", "bert", "xlnet", "LSTM"]:
+        if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             start_index = pd.DataFrame(data= range(data.shape[0]), columns=["index"])
             if self.smartBatching:
                 dataloader = self.applySmartBatching(data, mask, index= start_index, text="Do Inference")

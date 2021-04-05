@@ -1,5 +1,5 @@
 import pandas as pd
-from transformers import DistilBertTokenizer, BertTokenizer, XLMTokenizer
+from transformers import DistilBertTokenizer, BertTokenizer, XLMTokenizer, RobertaTokenizer
 from nltk import word_tokenize
 import fasttext
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -17,9 +17,9 @@ class Tokenizer():
     def fit(self, series: pd.Series):
         if self.args["tokenizer"] == "bert":
             if self.doLower:
-                tokenizer = BertTokenizer.from_pretrained('bert-base-german-dbmdz-uncased')
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
             else:
-                tokenizer = BertTokenizer.from_pretrained('bert-base-german-cased')
+                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
             def generate_BERT_vectors(s):
                 toks = tokenizer(s,  return_attention_mask= True, padding="max_length", truncation= True)
                 return (toks["input_ids"], toks["attention_mask"])
@@ -28,9 +28,9 @@ class Tokenizer():
         elif self.args["tokenizer"] == "distilbert":
             if self.doLower:
                 # distilbert german uncased should be used, however a pretrained model does not exist
-                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-german-cased')
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
             else:
-                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-german-cased')
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
             def generate_DistilBERT_vectors(s):
                 toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation= True)
                 return (toks["input_ids"], toks["attention_mask"])
@@ -38,15 +38,39 @@ class Tokenizer():
 
         elif self.args["tokenizer"] == "xlnet":
             if self.doLower:
-                # distilbert german uncased should be used, however a pretrained model does not exist
-                tokenizer = XLMTokenizer.from_pretrained('distilbert-base-german-cased')
+                # XLNET uncased should be used, however a pretrained model does not exist
+                tokenizer = XLMTokenizer.from_pretrained('xlnet-base-cased')
             else:
-                tokenizer = XLMTokenizer.from_pretrained('distilbert-base-german-cased')
+                tokenizer = XLMTokenizer.from_pretrained('xlnet-base-cased')
 
             def generate_XLM_vectors(s):
                 toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation=True)
                 return (toks["input_ids"], toks["attention_mask"])
             self.tokenizer = generate_XLM_vectors
+
+        elif self.args["tokenizer"] == "roberta":
+            if self.doLower:
+                # roberta uncased should be used, however a pretrained model does not exist
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+            else:
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+
+            def generate_Roberta_vectors(s):
+                toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation=True)
+                return (toks["input_ids"], toks["attention_mask"])
+            self.tokenizer = generate_Roberta_vectors
+
+        elif self.args["tokenizer"] == "distilroberta":
+            if self.doLower:
+                # distilroberta uncased should be used, however a pretrained model does not exist
+                tokenizer = RobertaTokenizer.from_pretrained('distilroberta-base')
+            else:
+                tokenizer = RobertaTokenizer.from_pretrained('distilroberta-base')
+
+            def generate_DistilRoberta_vectors(s):
+                toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation=True)
+                return (toks["input_ids"], toks["attention_mask"])
+            self.tokenizer = generate_DistilRoberta_vectors
 
         elif "fasttext" in self.args["tokenizer"]:
             embeddingModel = fasttext.load_model(self.fasttextFile)
