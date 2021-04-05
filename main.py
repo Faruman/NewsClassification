@@ -202,17 +202,9 @@ if __name__ == "__main__":
     print("Train Model")
     model = Model(args= tokenizer_model, doLower= args["doLower"], train_batchSize= args["train_batchSize"], testval_batchSize= args["testval_batchSize"], learningRate= args["learningRate"], doLearningRateScheduler= args["doLearningRateScheduler"], labelSentences= labelSentencesDict, smartBatching=args["smartBatching"], max_label_len= max_label_len, device= device)
 
-    # define optimizer
-    if args["optimizer"] == "adam":
-        optimizer = optim.Adam(model.model.parameters(), args["learningRate"])
-    elif args["optimizer"] == "sgd":
-        optimizer = torch.optim.SGD(model.model.parameters(), args["learningRate"])
-    else:
-        optimizer = None
-
-    model.run(train_data= train_df[data_column], train_target= train_df[args["targets"]], val_data= val_df[data_column], val_target= val_df[args["targets"]], test_data= test_df[data_column], test_target= test_df[args["targets"]], epochs= args["numEpochs"], optimizer= optimizer, excel_path= args["excel_path"])
+    model.run(train_data= train_df[data_column], train_target= train_df[args["targets"]], val_data= val_df[data_column], val_target= val_df[args["targets"]], test_data= test_df[data_column], test_target= test_df[args["targets"]], epochs= args["numEpochs"])
 
     wandb.log({'finished': True})
 
     #save the model
-    model.save(os.path.join(args["model_path"], "{}.pt".format(wandb.run.name)))
+    #model.save(os.path.join(args["model_path"], "{}".format(wandb.run.name)))
