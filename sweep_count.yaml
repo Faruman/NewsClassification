@@ -1,0 +1,45 @@
+program: main.py
+method: bayes
+metric:
+  goal: maximize
+  name: validate_macroF1
+parameters:
+  tokenizer_model:
+    values:
+      - "{'tokenizer': 'bow', 'model': 'naivebayes', 'ngram': 1}"
+      - "{'tokenizer': 'bow', 'model': 'naivebayes', 'ngram': 2}"
+      - "{'tokenizer': 'bow', 'model': 'naivebayes', 'ngram': 3}"
+      - "{'tokenizer': 'tfidf', 'model': 'naivebayes', 'ngram': 1}"
+      - "{'tokenizer': 'tfidf', 'model': 'naivebayes', 'ngram': 2}"
+      - "{'tokenizer': 'tfidf', 'model': 'naivebayes', 'ngram': 3}"
+      - "{'tokenizer': 'bow', 'model': 'gradboost', 'n_estimators': 50, 'max_depth': 3, 'ngram': 1}"
+      - "{'tokenizer': 'bow', 'model': 'gradboost', 'n_estimators': 50, 'max_depth': 5, 'ngram': 2}"
+      - "{'tokenizer': 'tfidf', 'model': 'gradboost', 'n_estimators': 50, 'max_depth': 3, 'ngram': 1}"
+      - "{'tokenizer': 'tfidf', 'model': 'gradboost', 'n_estimators': 50, 'max_depth': 5, 'ngram': 2}"
+    distribution: categorical
+  learningRate:
+    max: 0.0001
+    min: 1e-08
+    distribution: uniform
+  numEpochs:
+      max: 5
+      min: 1
+      distribution: int_uniform
+  doLower:
+    values:
+      - true
+      - false
+    distribution: categorical
+  doLemmatization:
+    values:
+      - true
+      - false
+    distribution: categorical
+  removeStopWords:
+    values:
+      - true
+      - false
+    distribution: categorical
+  data_used:
+    value: 1.0
+

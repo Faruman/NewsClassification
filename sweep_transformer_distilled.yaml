@@ -1,0 +1,38 @@
+program: main.py
+method: bayes
+metric:
+  goal: maximize
+  name: validate_macroF1
+parameters:
+  tokenizer_model:
+    values:
+      - "{'tokenizer': 'bert', 'model': 'bert', 'binaryClassification': 'False', 'optimizer': 'adam'}"
+      - "{'tokenizer': 'roberta', 'model': 'roberta', 'binaryClassification': 'False', 'optimizer': 'adam'}"
+      - "{'tokenizer': 'xlnet', 'model': 'xlnet', 'binaryClassification': 'False', 'optimizer': 'adam'}"
+    distribution: categorical
+  learningRate:
+    max: 0.0001
+    min: 1e-08
+    distribution: uniform
+  numEpochs:
+      max: 3
+      min: 1
+      distribution: int_uniform
+  doLower:
+    values:
+      - true
+      - false
+    distribution: categorical
+  doLemmatization:
+    values:
+      - true
+      - false
+    distribution: categorical
+  removeStopWords:
+    values:
+      - true
+      - false
+    distribution: categorical
+  data_used:
+    value: 1.0
+
