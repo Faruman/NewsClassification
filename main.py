@@ -23,6 +23,8 @@ from nltk import word_tokenize
 import nltk
 nltk.download('punkt')
 
+import subprocess
+subprocess.check_call([sys.executable, "-m", "pip", "install", "SentencePiece"])
 
 def pd_load_multiple_files(path):
     if path.split(".")[-1] == "csv":

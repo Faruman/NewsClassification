@@ -128,12 +128,12 @@ class Model():
         #elif self.args["model"] == "CNN":
         #    self.model = MyLSTM(num_labels=self.num_labels)
 
-        elif self.args["model"] == "gradientboost":
+        elif self.args["model"] == "gradboost":
             self.model = GradientBoostingClassifier(learning_rate= self.learningRate, n_estimators= self.args["n_estimators"], max_depth= self.args["max_depth"], verbose=1)
             self.input_multiclass_as_one = True
 
         elif self.args["model"] == "randomforest":
-            self.model = RandomForestClassifier(learning_rate= self.learningRate, n_estimators= self.args["n_estimators"], max_depth= self.args["max_depth"], verbose=1, n_jobs= -1)
+            self.model = RandomForestClassifier(n_estimators= self.args["n_estimators"], max_depth= self.args["max_depth"], verbose=1, n_jobs= -1)
             self.input_multiclass_as_one = True
 
         elif self.args["model"] == "naivebayes":
@@ -196,7 +196,7 @@ class Model():
             else:
                 return df["data"].values, df["mask"].values, target
         else:
-            mask = np.full(data.shape, 1)
+            mask = None
             return data, mask, target
 
     def applySmartBatching(self, data, mask, target= None, index= None, text= "Iteration:"):
