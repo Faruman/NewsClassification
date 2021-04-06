@@ -7,7 +7,7 @@ import random
 
 import pandas as pd
 import numpy as np
-import scipy
+from scipy import sparse
 
 from sklearn.model_selection import train_test_split
 
@@ -92,12 +92,21 @@ if __name__ == "__main__":
     run_preprocessing = False
     run_tokenization = False
 
-    if os.path.exists(train_tok_path.format("data") + ".npy") and os.path.exists(train_tok_path.format("target") + ".npy") and os.path.exists(val_tok_path.format("data") + ".npy") and os.path.exists(val_tok_path.format("target") + ".npy") and os.path.exists(test_tok_path.format("data") + ".npy") and os.path.exists(test_tok_path.format("target") + ".npy"):
-        train_data = np.load(train_tok_path.format("data") + ".npy", allow_pickle=True)
-        val_data = np.load(val_tok_path.format("data") + ".npy", allow_pickle=True)
-        test_data = np.load(test_tok_path.format("data") + ".npy", allow_pickle=True)
+    if (os.path.exists(train_tok_path.format("data") + ".npy") and os.path.exists(train_tok_path.format("target") + ".npy") and os.path.exists(val_tok_path.format("data") + ".npy") and os.path.exists(val_tok_path.format("target") + ".npy") and os.path.exists(test_tok_path.format("data") + ".npy") and os.path.exists(test_tok_path.format("target") + ".npy")) or (os.path.exists(train_tok_path.format("data") + ".npz") and os.path.exists(train_tok_path.format("target") + ".npy") and os.path.exists(val_tok_path.format("data") + ".npz") and os.path.exists(val_tok_path.format("target") + ".npy") and os.path.exists(test_tok_path.format("data") + ".npz") and os.path.exists(test_tok_path.format("target") + ".npy")):
+        if "bow-" in train_tok_path or "tfidf-" in train_tok_path:
+            train_data = sparse.load_npz(train_tok_path.format("data") + ".npz")
+        else:
+            train_data = np.load(train_tok_path.format("data") + ".npy", allow_pickle=True)
         train_target = np.load(train_tok_path.format("target") + ".npy", allow_pickle=True)
+        if "bow-" in val_tok_path or "tfidf-" in val_tok_path:
+            val_data = sparse.load_npz(val_tok_path.format("data") + ".npz")
+        else:
+            val_data = np.load(val_tok_path.format("data") + ".npy", allow_pickle=True)
         val_target = np.load(val_tok_path.format("target") + ".npy", allow_pickle=True)
+        if "bow-" in test_tok_path or "tfidf-" in test_tok_path:
+            test_data = sparse.load_npz(test_tok_path.format("data") + ".npz")
+        else:
+            test_data = np.load(test_tok_path.format("data") + ".npy", allow_pickle=True)
         test_target = np.load(test_tok_path.format("target") + ".npy", allow_pickle=True)
     elif os.path.exists(train_pre_path.format("data") + ".npy") and os.path.exists(train_pre_path.format("target") + ".npy") and os.path.exists(val_pre_path.format("data") + ".npy") and os.path.exists(val_pre_path.format("target") + ".npy") and os.path.exists(test_pre_path.format("data") + ".npy") and os.path.exists(test_pre_path.format("target") + ".npy"):
         train_data = np.load(train_pre_path.format("data") + ".npy", allow_pickle=True)
@@ -188,11 +197,20 @@ if __name__ == "__main__":
         ## save the preprocessed data
         if not os.path.exists(os.path.join(args["data_path"], "temp")):
             os.makedirs(os.path.join(args["data_path"], "temp"))
-        np.save(train_tok_path.format("data"), train_data)
-        np.save(val_tok_path.format("data"), val_data)
-        np.save(test_tok_path.format("data"), test_data)
+        if sparse.issparse(train_data):
+            sparse.save_npz(train_tok_path.format("data"), train_data)
+        else:
+            np.save(train_tok_path.format("data"), train_data)
         np.save(train_tok_path.format("target"), train_target)
+        if sparse.issparse(val_data):
+            sparse.save_npz(val_tok_path.format("data"), val_data)
+        else:
+            np.save(val_tok_path.format("data"), val_data)
         np.save(val_tok_path.format("target"), val_target)
+        if sparse.issparse(val_data):
+            sparse.save_npz(test_tok_path.format("data"), test_data)
+        else:
+            np.save(test_tok_path.format("data"), test_data)
         np.save(test_tok_path.format("target"), test_target)
 
     ## for testing purposes
