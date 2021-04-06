@@ -19,3 +19,8 @@ We encourage you to run additional experiments that enhance the basic study.   H
 - The “AG News” dataset was compiled many years ago.  Get some news articles from 2021and run the classifiers. See if there’s any noticeable divergence.
 - In the lab we could not run the third notebook, which uses Spacy to get linguistic analysisof  textual  data:  proper  tokenization,  syntactic  categories,  named  entities,  . . .   Check  thatnotebook,  and  run  spacy  on  this  data,  in  order  to  analyze  linguistic  aspects  of  it.   Whatnouns, verbs and adjectives are most frequent in each of the categories?  What entities doesSpacy find?  Start with a small sample of documents, and once you are familiar with Spacyand its output, add more documents to your analsys as much as it’s not too demanding foryour computers.
 - Try neural networks. Try a CNN! Plenty of tutorials out there!
+
+
+## Solution
+
+A first report can be found [here](https://wandb.ai/faruman/NewsClassification/reports/Report-Text-Calssification-Project--Vmlldzo1ODY4OTc)
