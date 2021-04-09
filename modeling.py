@@ -53,7 +53,6 @@ def plot_auc(label, score, title):
     _ = plt.title(title)
     return plt
 
-#TODO: implement new step variabels
 
 class Model():
     def __init__(self, args: dict, doLower: bool, train_batchSize: int, testval_batchSize:int, learningRate: float, doLearningRateScheduler: bool, target_columns: list, smartBatching: bool = True, mixedPrecision: bool = True, labelSentences: dict = None, max_label_len= None, model= None, optimizer= None, loss_fct= None, device= "cpu"):
@@ -73,20 +72,23 @@ class Model():
         self.target_columns = target_columns
         self.input_multiclass_as_one = False
 
+
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
+            # define loss function
             if loss_fct:
                 self.loss_fct = loss_fct
             else:
                 self.loss_fct = BCEWithLogitsLoss()
 
+            # define how many labels need to be classified
             if self.args["binaryClassification"]:
                 self.num_labels = 1
             else:
                 self.num_labels = len(self.labelSentences.keys())
 
+        # build model from the model_str
         if self.args["model"] == "distilbert":
             if doLower:
-                # distilbert german uncased should be used, however a pretrained model does not exist
                 self.model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=self.num_labels, output_attentions=False, output_hidden_states=False, torchscript=True)
                 self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
             else:
@@ -103,6 +105,7 @@ class Model():
 
         elif self.args["model"] == "xlnet":
             if doLower:
+                # no lowercase version exists therefore using the cased version in the doLower case as well
                 self.model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased', num_labels=self.num_labels, output_attentions=False, output_hidden_states=False, torchscript=True)
                 self.tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
             else:
@@ -153,10 +156,12 @@ class Model():
             sys.exit("Define a model in the args dict.")
 
     def preprocess(self, data, target, max_label_len, target_columns):
+        # do preprocessing for transformer models
         if self.args["model"] in ["distilbert", "bert", "xlnet", "roberta", "distilroberta"]:
             df = pd.DataFrame([[a, b] for a, b in data], columns=["data", "mask"])
             df = pd.concat([df, pd.DataFrame(target, columns=target_columns)], axis=1)
             if self.args["binaryClassification"]:
+                # add auxiliary sentences for the binary classification
                 max_label_len += 2
                 if type(self.labelSentences[list(self.labelSentences.keys())[0]]) == str:
                     for key in self.labelSentences.keys():
@@ -199,6 +204,7 @@ class Model():
             mask = None
             return data, mask, target
 
+    # implementation of smart batching, create different sample batches with different length to speed up the training process
     def applySmartBatching(self, data, mask, target= None, index= None, text= "Iteration:"):
         data = np.stack(data)
         mask = np.stack(mask)
@@ -266,6 +272,7 @@ class Model():
         else:
             return tzip(data_batch, mask_batch, desc=text)
 
+    # implementation of normal batching
     def applyNormalBatching(self, data, mask, target = None, text= "Iteration:"):
         data = torch.tensor(np.stack(data), dtype=torch.long)
         mask = torch.tensor(np.stack(mask), dtype=torch.long)
@@ -276,9 +283,9 @@ class Model():
             data = TensorDataset(data, mask)
         return tqdm(DataLoader(data, batch_size=self.train_batchSize), text)
 
+    # training function (for one epoch)
     def train(self, data, mask, target, device= "cpu"):
         # TODO: recreate batches each epoch? => no, create extra argument
-        # TODO: Create own training routine for simple models
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             if self.smartBatching:
                 dataloader = self.applySmartBatching(data, mask, target, text= "Do training:")
@@ -350,7 +357,7 @@ class Model():
             else:
                 self.model.fit(data, target)
 
-
+    # test a model and calculate different scores such as F1, Recall, Precision and Accuracy
     def test_validate(self, data, mask, target, type: str, device= "cpu", use_wandb= True, decision_dict= None):
         if not decision_dict:
             decision_dict = dict(zip(self.target_columns, [0.5]*len(self.target_columns)))
@@ -425,10 +432,13 @@ class Model():
         else:
             return {'{}_macroF1'.format(type): macroF1, '{}_macroPrec'.format(type): macroPrec, '{}_macroRec'.format(type): macroRec, '{}_Acc'.format(type): Acc}
 
+    # function to do the training process
     def run(self, train_data, train_target, val_data, val_target, test_data, test_target, epochs: int):
+        # prepare the data for binary classification
         train_data, train_mask, train_target = self.preprocess(train_data, train_target, self.max_label_len, self.target_columns)
         val_data, val_mask, val_target = self.preprocess(val_data, val_target, self.max_label_len, self.target_columns)
         test_data, test_mask, test_target = self.preprocess(test_data, test_target, self.max_label_len, self.target_columns)
+
 
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             if self.args["optimizer"] == "adam":
@@ -436,16 +446,17 @@ class Model():
             elif self.args["optimizer"] == "sgd":
                 self.optimizer = torch.optim.SGD(self.model.parameters(), self.learningRate)
             else:
-                self.optimizer = None
-
-            if not self.optimizer:
+                # use adam as default optimizer
                 self.optimizer = optim.Adam(self.model.parameters(), self.learningRate)
+
+            # implement learning rate scheduler to reduce learning rate after a defined time of steps
             if ~bool(self.learningRateScheduler) and self.doLearningRateScheduler:
                 num_train_steps = epochs * math.ceil(train_data.shape[0] / self.train_batchSize)
                 self.learningRateScheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps=int(0.1*num_train_steps), num_training_steps=num_train_steps)
 
             self.model.to(self.device)
 
+            # train the model for the defined number of epochs after each epoch do validation
             for i in range(epochs):
                 print("epoch {}".format(i))
                 self.train(train_data, train_mask, train_target, device= self.device)
@@ -453,10 +464,12 @@ class Model():
             self.test_validate(test_data, test_mask, test_target, type= "test", device= self.device)
 
         else:
+            # train sklearn based model without epochs
             self.train(train_data, train_mask, train_target, device=self.device)
             self.test_validate(val_data, val_mask, val_target, type="validate", device=self.device)
             self.test_validate(test_data, test_mask, test_target, type="test", device=self.device)
 
+    # function to save the model
     def save(self, file_path: str):
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             # save as torchscript
@@ -472,7 +485,7 @@ class Model():
 
         pd.DataFrame(data=self.target_columns, columns=["target"]).to_csv(file_path[:-3] + "_targetConfig.csv")
 
-
+    # function to load saved model
     def load(self, file_path):
         if self.args["model"] in ["distilbert", "bert", "xlnet", "lstm", "roberta", "distilroberta"]:
             self.model = torch.jit.load(file_path)
@@ -482,6 +495,7 @@ class Model():
 
         self.target_columns = list(pd.read_csv(file_path[:-3] + "_targetConfig.csv")["target"])
 
+    # function to predict new data
     def predict(self, data, device="cpu"):
         # Fake target system
         target = pd.DataFrame(data= np.zeros((data.shape[0], len(self.target_columns))), columns=self.target_columns)

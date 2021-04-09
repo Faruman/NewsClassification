@@ -51,7 +51,7 @@ class Tokenizer():
                 tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
 
             def generate_XLM_vectors(s):
-                toks = tokenizer(s, return_attention_mask=True, padding="max_length", truncation=True, max_length= self.max_length)
+                toks = tokenizer(s, return_attention_mask=True, padding=True, truncation=True, max_length= self.max_length)
                 return (toks["input_ids"], toks["attention_mask"])
             self.tokenizer = generate_XLM_vectors
             def tokenizer_fun(series):

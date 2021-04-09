@@ -26,7 +26,7 @@
   "removeHtmlTags": true,
   "minTextLength": 15,
 
-  "tokenizer_model": "{'tokenizer': 'fasttext', 'model': 'xlnet', 'binaryClassification': 'False', 'optimizer': 'adam'}",
+  "tokenizer_model": "{'tokenizer': 'xlnet', 'model': 'xlnet', 'binaryClassification': 'False', 'optimizer': 'adam'}",
   "fasttext_file": "./support/cc.en.300.bin",
   "train_batchSize": 6,
   "testval_batchSize": 12,

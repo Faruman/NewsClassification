@@ -26,6 +26,7 @@ nltk.download('punkt')
 import subprocess
 subprocess.check_call([sys.executable, "-m", "pip", "install", "SentencePiece"])
 
+# implementation of a dataloader which can handle multiple file types
 def pd_load_multiple_files(path):
     if path.split(".")[-1] == "csv":
         return(pd.read_csv(path))
@@ -39,9 +40,11 @@ def pd_load_multiple_files(path):
 
 
 if __name__ == "__main__":
+    # get all the configuration details from the config.json file
     with open(r"config.json") as f:
         args = json.load(f)
 
+    # initalize wandb to have online login and be able to run sweeps
     wandb.init(project= "NewsClassification", entity='faruman', config=args)
     args = wandb.config
     wandb.log({'finished': False})
@@ -50,6 +53,7 @@ if __name__ == "__main__":
     np.random.seed(42)
     torch.manual_seed(42)
 
+    # define on which device to run
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     tokenizer_model = json.loads(args["tokenizer_model"].replace("'", '"'))
@@ -63,15 +67,15 @@ if __name__ == "__main__":
 
     logging.info("training will be done on {}", device)
 
-    ## do the data loading
-    ### check for already preprocessed files
+    # do the data loading
+    ## check for already preprocessed files
     train_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_train_{}-{}-{}-{}-{}-{}".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
     val_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_val_{}-{}-{}-{}-{}-{}".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
     if args["test_data_file"]:
         test_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_test_{}-{}-{}-{}-{}-{}".format(args["test_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
     else:
         test_pre_path = os.path.join(args["data_path"], "temp", "{}_prep_test_{}-{}-{}-{}-{}-{}".format(args["train_data_file"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
-    ### check for already tokenized files
+    ## check for already tokenized files
     if "ngram" in tokenizer_model.keys():
         train_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_train_{}-{}-{}-{}-{}-{}-{}-{}".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
         val_tok_path = os.path.join(args["data_path"], "temp", "{}_tok_val_{}-{}-{}-{}-{}-{}-{}_{}".format(args["train_data_file"], tokenizer_model["tokenizer"], tokenizer_model["ngram"], args["doLower"], args["doLemmatization"], args["removeStopWords"], args["removeNewLine"], args["removePunctuation"], args["data_used"]) + "_{}")
@@ -123,7 +127,7 @@ if __name__ == "__main__":
         run_tokenization = True
 
     if run_preprocessing:
-        ### train
+        ## create the train data
         train_df = pd_load_multiple_files(os.path.join(args["data_path"], args["train_data_file"]))
         train_df = train_df.drop(args["train_data_drop"], axis= 1)
         train_df = train_df.sample(int(train_df.shape[0] * args["data_used"]))
@@ -136,7 +140,7 @@ if __name__ == "__main__":
             logging.error("train_df has too many columns, check your files.")
             sys.exit("train_df has too many columns, check your files.")
 
-        ### test
+        ## create the test data
         if args["test_data_file"]:
             test_df = pd_load_multiple_files(os.path.join(args["data_path"], args["test_data_file"]))
             test_df = test_df.drop(args["test_data_drop"], axis=1)
@@ -151,14 +155,14 @@ if __name__ == "__main__":
         else:
             train_df, test_df = train_test_split(train_df, test_size= args["test_split"], random_state= 42)
 
-        ### validation
+        ## create the validation data
         if args["validation_split"]:
             train_df, val_df = train_test_split(train_df, test_size=args["validation_split"], random_state=42)
         else:
             logging.error("vaidation_split needs to be given.")
             sys.exit("vaidation_split needs to be given.")
 
-        ## get data and train columns
+        ## get data columns
         data_column = list(set(train_df.columns) - set(args["targets"]))[0]
         train_target = train_df[args["targets"]].values
         val_target = val_df[args["targets"]].values
@@ -220,8 +224,9 @@ if __name__ == "__main__":
     #val_df = val_df.sample(20)
     #test_df = test_df.sample(20)
 
-    ## apply the model
+    # train the model
     cathegoryDict = {"science_int": "science", "sports_int": "sports", "world_int": "the world", "business_int": "business"}
+    ## create the auxiliary sentences which are needed if binary classification is done.
     texts = ["The article is about {}.".format(cathegoryDict[x]) for x in args["targets"]]
     labelSentencesDict = dict(zip(args["targets"], texts))
     max_label_len = max([len(word_tokenize(x)) for x in labelSentencesDict.values()])
@@ -229,9 +234,11 @@ if __name__ == "__main__":
     print("Train Model")
     model = Model(args= tokenizer_model, doLower= args["doLower"], train_batchSize= args["train_batchSize"], testval_batchSize= args["testval_batchSize"], learningRate= args["learningRate"], doLearningRateScheduler= args["doLearningRateScheduler"], labelSentences= labelSentencesDict, smartBatching=args["smartBatching"], max_label_len= max_label_len, device= device, target_columns= args["targets"])
 
+    # train and test the model
     model.run(train_data= train_data, train_target= train_target, val_data= val_data, val_target= val_target, test_data= test_data, test_target= test_target, epochs= args["numEpochs"])
 
+    # close the logging
     wandb.log({'finished': True})
 
-    #save the model
+    # save the model
     #model.save(os.path.join(args["model_path"], "{}".format(wandb.run.name)))
